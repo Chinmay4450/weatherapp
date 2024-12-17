@@ -1,12 +1,5 @@
-def sanitize_text(value):
-            if isinstance(value, str):
-                return value.replace("\n", " ").strip()  # Replace newline with space and strip whitespace
-            return value
+Thank you for highlighting this. The delay occurred as my timesheet had to be revised due to a time swap between my standard and shift timings. I sincerely apologize for the inconvenience caused.
 
-        # Sanitize all data in the input list
-        sanitized_data = [
-            {key: sanitize_text(value) for key, value in record.items()}
-            for record in data
-        ]
+Going forward, I will ensure timely submission of timesheets on a weekly basis.
 
-        
+Thank you for your patience and understanding.
