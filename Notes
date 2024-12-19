@@ -1,0 +1,37 @@
+def extract_data_to_csv(data, output_file="output.csv"):
+    extracted_data = []
+    try:
+        # Check if 'value' is a list
+        if not isinstance(data.get("value"), list):
+            raise ValueError("The 'value' key is missing or is not a list.")
+
+        # Loop through each item in 'value'
+        for item in data["value"]:
+            try:
+                fields = item.get("fields", {})
+                if not isinstance(fields, dict):
+                    fields = {}  # Default to an empty dictionary if 'fields' is invalid
+
+                # Extract 'Title', 'Field1', and 'Field2', defaulting to None if missing
+                title = fields.get("Title")
+                field1 = fields.get("Field1")
+                field2 = fields.get("Field2")
+
+                # Append the extracted data as a row
+                extracted_data.append({
+                    "Title": title,
+                    "Field1": field1,
+                    "Field2": field2
+                })
+            except Exception as inner_err:
+                print(f"Unexpected error processing item {item}: {inner_err}")
+    except Exception as err:
+        print(f"Error processing data: {err}")
+
+    # Create a DataFrame and save it as a CSV
+    df = pd.DataFrame(extracted_data)
+    df.to_csv(output_file, index=False)
+    print(f"Data has been written to {output_file}")
+
+# Call the function to extract data and create a CSV
+extract_data_to_csv(data, "output.csv")
