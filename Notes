@@ -1,0 +1,115 @@
+import requests
+import pandas as pd
+
+# Replace with your actual Snyk API token
+API_TOKEN = "YOUR_API_TOKEN"
+BASE_URL = "https://snyk.io/api/v1"  # Snyk API base URL
+
+# Replace with your actual organization ID
+ORG_ID = "YOUR_ORG_ID"
+
+# Headers for the API requests
+HEADERS = {
+    "Authorization": f"Bearer {API_TOKEN}",
+    "Content-Type": "application/json"
+}
+
+# Output CSV file
+OUTPUT_FILE = "snyk_project_data.csv"
+
+# Function to fetch all project IDs from the organization
+def fetch_project_ids():
+    url = f"{BASE_URL}/org/{ORG_ID}/projects"
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code == 200:
+        projects = response.json().get("projects", [])
+        return [project["id"] for project in projects]
+    else:
+        print(f"Failed to fetch projects. Status code: {response.status_code}")
+        return []
+
+# Function to fetch project details
+def fetch_project_data(project_id):
+    url = f"{BASE_URL}/org/{ORG_ID}/project/{project_id}"
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to fetch data for project {project_id}. Status code: {response.status_code}")
+        return None
+
+# Function to fetch project vulnerabilities
+def fetch_project_issues(project_id):
+    url = f"{BASE_URL}/org/{ORG_ID}/project/{project_id}/issues"
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to fetch issues for project {project_id}. Status code: {response.status_code}")
+        return None
+
+# Main script to fetch data and save to CSV
+def main():
+    # Fetch all project IDs
+    print("Fetching all project IDs...")
+    project_ids = fetch_project_ids()
+    if not project_ids:
+        print("No projects found or failed to fetch project IDs.")
+        return
+
+    print(f"Found {len(project_ids)} projects.")
+
+    # Initialize an empty list to store data
+    data = []
+
+    # Fetch data for each project
+    for project_id in project_ids:
+        print(f"Fetching data for project ID: {project_id}")
+        project_data = fetch_project_data(project_id)
+        project_issues = fetch_project_issues(project_id)
+
+        # Skip if no data is available
+        if not project_data or not project_issues:
+            continue
+
+        # Extract project details
+        project_name = project_data.get("name", "N/A")
+        origin = project_data.get("origin", "N/A")
+        project_type = project_data.get("type", "N/A")
+
+        # Extract issues
+        issues = project_issues.get("issues", [])
+        for issue in issues:
+            severity = issue.get("severity", "N/A")
+            vulnerability_id = issue.get("id", "N/A")
+            title = issue.get("title", "N/A")
+            package_name = issue.get("packageName", "N/A")
+            version = issue.get("version", "N/A")
+            fixed_in = ", ".join(issue.get("fix", {}).get("fixedIn", [])) if issue.get("fix", {}) else "N/A"
+
+            # Append a row to the data list
+            data.append({
+                "Project ID": project_id,
+                "Project Name": project_name,
+                "Origin": origin,
+                "Type": project_type,
+                "Severity": severity,
+                "Vulnerability ID": vulnerability_id,
+                "Title": title,
+                "Package Name": package_name,
+                "Version": version,
+                "Fixed In": fixed_in
+            })
+
+        print(f"Data fetched for project ID: {project_id}")
+
+    # Convert data to a Pandas DataFrame
+    df = pd.DataFrame(data)
+
+    # Save the DataFrame to a CSV file
+    df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
+
+    print(f"Data saved to {OUTPUT_FILE}")
+
+if __name__ == "__main__":
+    main()
