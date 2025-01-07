@@ -1,115 +1,108 @@
 import requests
+import json
 import pandas as pd
+import logging
 
-# Replace with your actual Snyk API token
-API_TOKEN = "YOUR_API_TOKEN"
-BASE_URL = "https://snyk.io/api/v1"  # Snyk API base URL
+logging.basicConfig(
+    filename="pr_fetcher.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
-# Replace with your actual organization ID
-ORG_ID = "YOUR_ORG_ID"
+class GitHubPRFetcher:
+    def __init__(self, api_token, base_api_url):
+        self.headers = {
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+        }
+        self.base_api_url = base_api_url
 
-# Headers for the API requests
-HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
-    "Content-Type": "application/json"
-}
+    def get_pull_requests(self, contributor):
+        try:
+            query = f"{self.base_api_url}/search/issues?q=author:{contributor}&type=pr"
+            response = requests.get(query, headers=self.headers)
+            if response.status_code == 200:
+                logging.info(f"Pull requests fetched for {contributor}")
+                return response.json()
+            else:
+                logging.error(f"Failed to fetch pull requests for {contributor}: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching pull requests for {contributor}: {e}")
+            return None
 
-# Output CSV file
-OUTPUT_FILE = "snyk_project_data.csv"
+    def check_for_reviews(self, pull_url):
+        try:
+            api_url = f"{pull_url}/reviews"
+            response = requests.get(api_url, headers=self.headers)
+            if response.status_code == 200:
+                logging.info(f"Reviews fetched for {pull_url}")
+                return response.json()
+            else:
+                logging.error(f"Failed to fetch reviews for {pull_url}: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching reviews for {pull_url}: {e}")
+            return None
 
-# Function to fetch all project IDs from the organization
-def fetch_project_ids():
-    url = f"{BASE_URL}/org/{ORG_ID}/projects"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        projects = response.json().get("projects", [])
-        return [project["id"] for project in projects]
-    else:
-        print(f"Failed to fetch projects. Status code: {response.status_code}")
+    def process_teams(self, teams_data):
+        csv_data = []
+        for team in teams_data:
+            team_name = team.get("Name")
+            for member in team.get("Members", []):
+                pull_requests = self.get_pull_requests(member)
+                if pull_requests and "items" in pull_requests:
+                    for pull_request in pull_requests["items"]:
+                        pull_url = pull_request.get("pull_request", {}).get("url", None)
+                        if pull_url:
+                            reviews = self.check_for_reviews(pull_url)
+                            has_changes_requested = any(
+                                item.get("state") == "CHANGES_REQUESTED" for item in reviews or []
+                            )
+                            csv_data.append({
+                                "Team Name": team_name,
+                                "Short Name": pull_request.get("user", {}).get("login", None),
+                                "Repository URL": pull_request.get("repository_url", None),
+                                "Title": pull_request.get("title", None),
+                                "Created At": pull_request.get("created_at", None),
+                                "Updated At": pull_request.get("updated_at", None),
+                                "PR Changes": has_changes_requested,
+                            })
+                        else:
+                            logging.warning(f"Pull URL not found for member: {member}")
+                else:
+                    logging.warning(f"No pull requests found for member: {member}")
+        return csv_data
+
+
+def read_json(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+            logging.info(f"Successfully read JSON file: {file_path}")
+            return data
+    except Exception as e:
+        logging.error(f"Error reading JSON file {file_path}: {e}")
         return []
 
-# Function to fetch project details
-def fetch_project_data(project_id):
-    url = f"{BASE_URL}/org/{ORG_ID}/project/{project_id}"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Failed to fetch data for project {project_id}. Status code: {response.status_code}")
-        return None
 
-# Function to fetch project vulnerabilities
-def fetch_project_issues(project_id):
-    url = f"{BASE_URL}/org/{ORG_ID}/project/{project_id}/issues"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Failed to fetch issues for project {project_id}. Status code: {response.status_code}")
-        return None
+def save_to_csv(data, output_file):
+    try:
+        df = pd.DataFrame(data)
+        df.to_csv(output_file, index=False)
+        logging.info(f"Data successfully saved to CSV: {output_file}")
+    except Exception as e:
+        logging.error(f"Error saving data to CSV: {e}")
 
-# Main script to fetch data and save to CSV
-def main():
-    # Fetch all project IDs
-    print("Fetching all project IDs...")
-    project_ids = fetch_project_ids()
-    if not project_ids:
-        print("No projects found or failed to fetch project IDs.")
-        return
-
-    print(f"Found {len(project_ids)} projects.")
-
-    # Initialize an empty list to store data
-    data = []
-
-    # Fetch data for each project
-    for project_id in project_ids:
-        print(f"Fetching data for project ID: {project_id}")
-        project_data = fetch_project_data(project_id)
-        project_issues = fetch_project_issues(project_id)
-
-        # Skip if no data is available
-        if not project_data or not project_issues:
-            continue
-
-        # Extract project details
-        project_name = project_data.get("name", "N/A")
-        origin = project_data.get("origin", "N/A")
-        project_type = project_data.get("type", "N/A")
-
-        # Extract issues
-        issues = project_issues.get("issues", [])
-        for issue in issues:
-            severity = issue.get("severity", "N/A")
-            vulnerability_id = issue.get("id", "N/A")
-            title = issue.get("title", "N/A")
-            package_name = issue.get("packageName", "N/A")
-            version = issue.get("version", "N/A")
-            fixed_in = ", ".join(issue.get("fix", {}).get("fixedIn", [])) if issue.get("fix", {}) else "N/A"
-
-            # Append a row to the data list
-            data.append({
-                "Project ID": project_id,
-                "Project Name": project_name,
-                "Origin": origin,
-                "Type": project_type,
-                "Severity": severity,
-                "Vulnerability ID": vulnerability_id,
-                "Title": title,
-                "Package Name": package_name,
-                "Version": version,
-                "Fixed In": fixed_in
-            })
-
-        print(f"Data fetched for project ID: {project_id}")
-
-    # Convert data to a Pandas DataFrame
-    df = pd.DataFrame(data)
-
-    # Save the DataFrame to a CSV file
-    df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
-
-    print(f"Data saved to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
-    main()
+    API_TOKEN = "your_api_token_here"
+    BASE_API_URL = "https://api.github.com"
+    TEAMS_JSON_FILE = "teams.json"
+    OUTPUT_CSV_FILE = "pull_requests.csv"
+
+    pr_fetcher = GitHubPRFetcher(api_token=API_TOKEN, base_api_url=BASE_API_URL)
+    teams_data = read_json(TEAMS_JSON_FILE)
+    csv_data = pr_fetcher.process_teams(teams_data)
+    save_to_csv(csv_data, OUTPUT_CSV_FILE)
+    print(f"Data saved to {OUTPUT_CSV_FILE}")
