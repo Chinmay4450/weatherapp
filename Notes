@@ -1,61 +1,7 @@
-def get_rate_limit(self):
-        try:
-            url = f"{self.base_api_url}/rate_limit"
-            response = requests.get(url, headers=self.headers)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logging.error(f"Failed to fetch rate limit: {response.status_code}")
-                return None
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Error fetching rate limit: {e}")
-            return None
+Clarification on API Commit Data Visibility
 
-    def handle_rate_limit(self):
-        rate_limit_data = self.get_rate_limit()
-        if rate_limit_data:
-            remaining = rate_limit_data["rate"]["remaining"]
-            reset_time = rate_limit_data["rate"]["reset"]
-            if remaining == 0:
-                wait_time = reset_time - time.time()
-                if wait_time > 0:
-                    logging.info(f"Rate limit reached. Waiting for {int(wait_time)} seconds.")
-                    time.sleep(wait_time + 1)
+I tested a Git commit locally, but the data did not appear on the API. Even after pushing the commit, the data still didn’t show up on the API. However, once the pull request was approved, the data became visible on the API.
 
-    def get_pull_requests(self, contributor):
-        self.handle_rate_limit()
-        try:
-            query = f"{self.base_api_url}/search/issues?q=author:{contributor}&type=pr"
-            response = requests.get(query, headers=self.headers)
-            if response.status_code == 200:
-                logging.info(f"Pull requests fetched for {contributor}")
-                return response.json()
-            elif response.status_code == 403:  # Rate limit exceeded
-                self.handle_rate_limit()
-                return self.get_pull_requests(contributor)
-            else:
-                logging.error(f"Failed to fetch pull requests for {contributor}: {response.status_code}")
-                return None
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Error fetching pull requests for {contributor}: {e}")
-            return None
+Could you please confirm if this behavior is correct? Alternatively, is there another API where we can view the data?
 
-    def check_for_reviews(self, pull_url):
-        self.handle_rate_limit()
-        try:
-            api_url = f"{pull_url}/reviews"
-            response = requests.get(api_url, headers=self.headers)
-            if response.status_code == 200:
-                logging.info(f"Reviews fetched for {pull_url}")
-                return response.json()
-            elif response.status_code == 403:  # Rate limit exceeded
-                self.handle_rate_limit()
-                return self.check_for_reviews(pull_url)
-            else:
-                logging.error(f"Failed to fetch reviews for {pull_url}: {response.status_code}")
-                return None
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Error fetching reviews for {pull_url}: {e}")
-            return None
-
-    
+Looking forward to your response.
