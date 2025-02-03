@@ -4,9 +4,8 @@ if response.status_code == 200:
     jenkinsfile_content = response.text
 
     # Regex pattern to strictly match only `sonarkey`
-    pattern = re.compile(r'\bsonarkey\s*=\s*[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
-
-    match = pattern.search(jenkinsfile_content)
+    match = re.search(r"(?:args\.)?sonarKey\s*=\s*['\"]([^'\"]+)['\"]", jenkinsfile_content)
+    
 
     if match:
         sonar_dict["sonarkey"] = match.group(1)  # Capture the first valid sonarkey
