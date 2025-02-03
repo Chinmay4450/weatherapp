@@ -5,16 +5,25 @@ if response.status_code == 200:
 
     for line in jenkinsfile_content:
         line = line.strip()  # Remove extra spaces
+
+        # Look for sonarKey with or without 'args.'
         if "sonarKey" in line and "=" in line:
-            parts = line.split("=")
-            if len(parts) > 1:
-                sonar_key = parts[1].strip().strip("'\"")  # Remove spaces and quotes
+            key_value = line.split("=")  # Split at '='
+
+            if len(key_value) > 1:
+                value = key_value[1].strip()  # Remove spaces
+
+                # Handle cases where value might be in quotes
+                if value.startswith(("'", '"')) and value.endswith(("'", '"')):
+                    value = value[1:-1]
+
+                sonar_key = value
                 break  # Stop after finding the first occurrence
 
     if sonar_key:
         print(f"Sonar Key: {sonar_key}")
     else:
-        print("Sonar Key not found!")
+        print("Sonar Key not found! Check the Jenkinsfile format.")
 
 else:
     print(f"Failed to fetch Jenkinsfile. Status Code: {response.status_code}")
