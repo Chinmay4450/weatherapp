@@ -1,7 +1,18 @@
-Clarification on API Commit Data Visibility
+sonar_dict = {}
 
-I tested a Git commit locally, but the data did not appear on the API. Even after pushing the commit, the data still didn’t show up on the API. However, once the pull request was approved, the data became visible on the API.
+if response.status_code == 200:
+    jenkinsfile_content = response.text
+    
+    # Regular expression to find sonar parameters and their values
+    matches = re.findall(r'(\b(?:project\.sonarkey|sonarkey|sonarname)\b)\s*=\s*["\'](.+?)["\']', jenkinsfile_content, re.IGNORECASE)
 
-Could you please confirm if this behavior is correct? Alternatively, is there another API where we can view the data?
-
-Looking forward to your response.
+    if matches:
+        for param, value in matches:
+            if param not in sonar_dict:  # Store only the first occurrence
+                sonar_dict[param] = value
+            
+        print("Extracted SonarQube Parameters:", sonar_dict)
+    else:
+        print("No SonarQube parameters found in Jenkinsfile.")
+else:
+    print(f"Failed to fetch Jenkinsfile: {response.status_code}, {response.text}")
