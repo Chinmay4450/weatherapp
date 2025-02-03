@@ -2,17 +2,14 @@ sonar_dict = {}
 
 if response.status_code == 200:
     jenkinsfile_content = response.text
-    
-    # Regular expression to find sonar parameters and their values
-    matches = re.findall(r'(\b(?:project\.sonarkey|sonarkey|sonarname)\b)\s*=\s*["\'](.+?)["\']', jenkinsfile_content, re.IGNORECASE)
 
-    if matches:
-        for param, value in matches:
-            if param not in sonar_dict:  # Store only the first occurrence
-                sonar_dict[param] = value
-            
-        print("Extracted SonarQube Parameters:", sonar_dict)
+    # Regex pattern to strictly match only `sonarkey`
+    pattern = re.compile(r'\bsonarkey\s*=\s*[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
+
+    match = pattern.search(jenkinsfile_content)
+
+    if match:
+        sonar_dict["sonarkey"] = match.group(1)  # Capture the first valid sonarkey
+        print("Extracted SonarQube Key:", sonar_dict)
     else:
-        print("No SonarQube parameters found in Jenkinsfile.")
-else:
-    print(f"Failed to fetch Jenkinsfile: {response.status_code}, {response.text}")
+        print("No `sonarkey` found in Jenkinsfile.")
