@@ -1,14 +1,20 @@
-sonar_dict = {}
-
 if response.status_code == 200:
-    jenkinsfile_content = response.text
+    jenkinsfile_content = response.text.split("\n")  # Read content line by line
 
-    # Regex pattern to strictly match only `sonarkey`
-    match = re.search(r"(?:args\.)?sonarKey\s*=\s*['\"]([^'\"]+)['\"]", jenkinsfile_content)
-    
+    sonar_key = None
 
-    if match:
-        sonar_dict["sonarkey"] = match.group(1)  # Capture the first valid sonarkey
-        print("Extracted SonarQube Key:", sonar_dict)
+    for line in jenkinsfile_content:
+        line = line.strip()  # Remove extra spaces
+        if "sonarKey" in line and "=" in line:
+            parts = line.split("=")
+            if len(parts) > 1:
+                sonar_key = parts[1].strip().strip("'\"")  # Remove spaces and quotes
+                break  # Stop after finding the first occurrence
+
+    if sonar_key:
+        print(f"Sonar Key: {sonar_key}")
     else:
-        print("No `sonarkey` found in Jenkinsfile.")
+        print("Sonar Key not found!")
+
+else:
+    print(f"Failed to fetch Jenkinsfile. Status Code: {response.status_code}")
